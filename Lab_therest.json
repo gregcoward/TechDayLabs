@@ -433,7 +433,6 @@
           },
           "osDisk": {
             "name": "[concat(parameters('webpublicDnsName'), '-osDisk')]",
-            "osType": "Windows",
             "vhd": {
               "uri": "[variables('userImageName2')]"
             },
