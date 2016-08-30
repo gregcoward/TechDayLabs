@@ -1,0 +1,256 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "West US",
+      "allowedValues": [
+        "West US",
+        "East US",
+        "West Europe",
+        "East Asia",
+        "Southeast Asia"
+      ],
+      "metadata": {
+        "description": "The region to deploy the resources into"
+      }
+    },
+    "dcpublicDnsName": {
+      "type": "string",
+      "metadata": {
+        "description": "Unique public DNS prefix for the deployment. The fqdn will look something like '<dnsname>.westus.cloudapp.azure.com'. Up to 62 chars, digits or dashes, lowercase, should start with a letter: must conform to '^[a-z][a-z0-9-]{1,61}[a-z0-9]$'."
+      }
+    },
+    "webpublicDnsName": {
+      "type": "string",
+      "metadata": {
+        "description": "Unique public DNS prefix for the deployment. The fqdn will look something like '<dnsname>.westus.cloudapp.azure.com'. Up to 62 chars, digits or dashes, lowercase, should start with a letter: must conform to '^[a-z][a-z0-9-]{1,61}[a-z0-9]$'."
+      }
+    },
+    "f5publicDnsName": {
+      "type": "string",
+      "metadata": {
+        "description": "Unique public DNS prefix for the deployment. The fqdn will look something like '<dnsname>.westus.cloudapp.azure.com'. Up to 62 chars, digits or dashes, lowercase, should start with a letter: must conform to '^[a-z][a-z0-9-]{1,61}[a-z0-9]$'."
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "defaultValue": "Standard_A1",
+      "metadata": {
+        "description": "The size of the virtual machines"
+      }
+    },
+    "f5VMSize": {
+      "type": "string",
+      "metadata": {
+        "Description": "The size of the BIG-IP VM Created"
+      },
+      "defaultValue": "Standard_A3"
+    },
+    "domainName": {
+      "type": "string",
+      "metadata": {
+        "description": "The FQDN of the AD domain"
+      }
+    },
+    "domainNetBios": {
+      "type": "string",
+      "metadata": {
+        "description": "The NetBios name of AD domain"
+      }
+    },
+    "f5NicIPAddress": {
+      "type": "string",
+      "metadata": {
+        "Description": "The IP address of the new BIGIP"
+      },
+      "defaultValue": "10.0.0.10"
+    },
+    "dcNicIPAddress": {
+      "type": "string",
+      "metadata": {
+        "Description": "The IP address of the new BIGIP"
+      },
+      "defaultValue": "10.0.0.5"
+    },
+    "vmNicIPAddress": {
+      "type": "string",
+      "metadata": {
+        "Description": "The IP address of the new BIGIP"
+      },
+      "defaultValue": "10.0.0.8"
+    },
+    "adminUsername": {
+      "type": "string",
+      "defaultValue": "xuser",
+      "metadata": {
+        "description": "The name of the administrator of the new VM and the domain. Exclusion list: 'admin','administrator'"
+      }
+    },
+    "adminPassword": {
+      "type": "securestring",
+      "defaultValue": "F5testnet",
+      "metadata": {
+        "description": "The password for the administrator account of the new VM and the domain"
+      }
+    },
+    "imageSKU": {
+      "type": "string",
+      "allowedValues": [
+        "2012-R2-Datacenter",
+        "Windows-Server-Technical-Preview"
+      ],
+      "metadata": {
+        "description": "Windows server SKU"
+      },
+      "defaultValue": "2012-R2-Datacenter"
+    },
+    "AssetLocation": {
+      "type": "string",
+      "metadata": {
+        "description": "The location of resources such as templates and DSC modules that the script is dependent"
+      },
+      "defaultValue": "https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/active-directory-new-domain"
+    },
+    "userImageStorageAccountName": {
+      "type": "string",
+      "defaultValue": "appsteamstore",
+      "metadata": {
+        "description": "This is the name of the your storage account"
+      }
+    },
+    "userImageStorageContainerName": {
+      "type": "string",
+      "defaultValue": "vhds",
+      "metadata": {
+        "description": "This is the name of the container in your storage account"
+      }
+    },
+    "userImageVhdName": {
+      "type": "string",
+      "defaultValue": "bigipv12606best.vhd",
+      "metadata": {
+        "description": "This is the name of the your customized VHD"
+      }
+    }
+  },
+  "variables": {
+    "imagePublisher": "MicrosoftWindowsServer",
+    "imageOffer": "WindowsServer",
+    "vnetAddressRange": "10.0.0.0/16",
+    "subnetAddressRange": "10.0.0.0/24",
+    "subnetName": "Subnet",
+    "subnet-id": "[concat(resourceId('Microsoft.Network/virtualNetworks','VNET'),'/subnets/',variables('subnetName'))]",
+    "userImageName": "[concat('http://',parameters('userImageStorageAccountName'),'.blob.core.windows.net/',parameters('userImageStorageContainerName'),'/',parameters('userImageVhdName'))]",
+    "adModulesURL": "[concat(parameters('AssetLocation'),'/CreateADPDC.ps1.zip')]",
+    "adConfigurationFunction": "CreateADPDC.ps1\\CreateADPDC",
+    "userImageName3": "[concat('http://',parameters('userImageStorageAccountName'),'.blob.core.windows.net/',parameters('domainNetBios'),'/',parameters('dcpublicDnsName'),'-osdisk.vhd')]",
+    "userImageName4": "[concat('http://',parameters('userImageStorageAccountName'),'.blob.core.windows.net/',parameters('domainNetBios'),'/',parameters('dcpublicDnsName'),'-datadisk.vhd')]",
+    "vnetTemplateUri": "[concat(parameters('AssetLocation'),'/vnet.json')]",
+    "vnetwithDNSTemplateUri": "[concat(parameters('AssetLocation'),'/vnet-with-dns-server.json')]"
+  },
+  "resources": [
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/virtualNetworks",
+      "name": "VNET",
+      "location": "[parameters('location')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[variables('vnetAddressRange')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('subnetName')]",
+            "properties": {
+              "addressPrefix": "[variables('subnetAddressRange')]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "dc-nif",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "Microsoft.Network/virtualNetworks/VNET"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig",
+            "properties": {
+              "privateIPAllocationMethod": "Static",
+              "privateIPAddress": "[parameters('dcNicIPAddress')]",
+              "subnet": {
+                "id": "[variables('subnet-id')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-06-15",
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "dc",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "Microsoft.Network/virtualNetworks/VNET",
+        "Microsoft.Network/networkInterfaces/dc-nif"
+      ],
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('vmSize')]"
+        },
+        "osProfile": {
+          "computername": "dc",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[variables('imagePublisher')]",
+            "offer": "[variables('imageOffer')]",
+            "sku": "[parameters('imageSKU')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "osdisk",
+            "vhd": {
+              "uri": "[variables('userImageName3')]"
+            },
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          },
+          "dataDisks": [
+            {
+              "name": "dc-data-disk1",
+              "vhd": {
+                "uri": "[variables('userImageName4')]"
+              },
+              "caching": "None",
+              "createOption": "Empty",
+              "diskSizeGB": "1000",
+              "lun": 0
+            }
+          ]
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces','dc-nif')]"
+            }
+          ]
+        }
+      },
+      "resources": [
+      ]
+    }
+  ]
+  }
